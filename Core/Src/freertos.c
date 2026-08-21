@@ -131,10 +131,10 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the queue(s) */
   /* creation of LEDCmdQueue */
-  LEDCmdQueueHandle = osMessageQueueNew (10, sizeof(LEDCmdType*), &LEDCmdQueue_attributes);
+  LEDCmdQueueHandle = osMessageQueueNew (10, sizeof(LEDCmdType), &LEDCmdQueue_attributes);
 
   /* creation of UARTStrQueue */
-  UARTStrQueueHandle = osMessageQueueNew (5, sizeof(char*), &UARTStrQueue_attributes);
+  UARTStrQueueHandle = osMessageQueueNew (5, 16, &UARTStrQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */

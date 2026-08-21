@@ -5,15 +5,17 @@
 #include <stdlib.h>
 
 void StartBtnTask(void *argument) {
+  LED_Num Num = LED_1;
   LED_State State = LED_State_Off;
   for (;;) {
     if (HAL_GPIO_ReadPin(BTN_GPIO_Port, BTN_Pin) == GPIO_PIN_RESET) {
+      osDelay(20); // 延时 20ms 防抖
       if (HAL_GPIO_ReadPin(BTN_GPIO_Port, BTN_Pin) == GPIO_PIN_RESET) {
-        LEDCmdType* pLEDCmd = malloc(sizeof(LEDCmdType));
-        pLEDCmd->num = LED_1;
+        LEDCmdType cmd;
+        cmd.num = Num;
         State = !State;
-        pLEDCmd->state = State;
-        osMessageQueuePut(LEDCmdQueueHandle, &pLEDCmd, 0, osWaitForever);
+        cmd.state = State;
+        osMessageQueuePut(LEDCmdQueueHandle, &cmd, 0, osWaitForever);
         OLED_ShowString(1, 1, "Btn Pressed");
         osDelay(500);
         OLED_ShowString(1, 1, "           ");

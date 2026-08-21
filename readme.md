@@ -1,100 +1,86 @@
-# RTOS_02_Queue
+# RTOS_03_Queue_UART_IT_Btn_LED
 
 ## Introduction
 
-This project is built for the **STM32F103** series MCU (Cortex-M3) based on the STM32 HAL library and **FreeRTOS Kernel V10.3.1** using the **CMSIS-RTOS v2** API wrapper (`cmsis_os2.c`). It demonstrates inter-task communication (ITC) and synchronization using a **FreeRTOS Message Queue** (`osMessageQueue`).
+This project is built for the **STM32F103** series MCU (Cortex-M3) based on the STM32 HAL library and **FreeRTOS Kernel V10.3.1** using the **CMSIS-RTOS v2** API wrapper. It demonstrates inter-task communication (ITC) using multiple **FreeRTOS Message Queues** (`osMessageQueue`) and handles UART input via interrupts.
 
-The system implements a classic **Producer-Consumer** pattern with two concurrent tasks:
-1. **`BtnCntTask` (Producer)**: Scans and debounces the user button, increments a 16-bit counter, and puts the value into a message queue.
-2. **`DataPrcsTask` (Consumer)**: Blocks on the message queue, retrieves the count value, simulates data processing, and outputs real-time metrics to both an OLED display and a UART serial interface.
+The system implements a command-driven architecture where both hardware buttons and UART serial commands can control a set of LEDs.
 
 ---
 
 ## Key Features
 
-- **CMSIS-RTOS v2 Message Queue (`osMessageQueue`)**:
-  - Wraps the native FreeRTOS queue (`xQueueCreate`, `xQueueSendToBack`, `xQueueReceive`) into the standardized CMSIS-RTOS v2 API.
-  - Provides safe, decoupled, and thread-safe data transfer between tasks without polling or busy-waiting.
-- **Button Counting Task (`BtnCntTask` - Producer)**:
-  - Scans the user button on pin `PA6` (Active-Low with internal pull-up).
-  - Software debouncing (10 ms) and key-release detection to ensure reliable single-trigger counting.
-  - Enqueues the 16-bit counter value (`BtnCnt`) into `BtnCntQueue` with `osMessageQueuePut` (blocking, `osWaitForever`).
-  - Displays the current queue fill level (`osMessageQueueGetCount`) on OLED line 2.
-- **Data Processing Task (`DataPrcsTask` - Consumer)**:
-  - Blocks on `osMessageQueueGet` (infinite wait) for queue items.
-  - Displays `"Data Processing."` on OLED line 3 and simulates processing with a 2 s `HAL_Delay`.
-  - Updates the current counter on OLED line 1 (`OLED_ShowNum(1, 8, BtnCnt, 5)`).
-  - Transmits the formatted string `"BtnCnt: <value>\r\n"` over USART1 (`115200 8N1`).
-- **OLED Display Interface**: 0.96" SSD1306 (128×64) driven via software I2C (`PB8` = SCL, `PB9` = SDA, slave address `0x78`).
-- **UART Serial Logging**: Status telemetry output via USART1 (`PA9` = TX, `PA10` = RX).
-- **Dedicated HAL Timebase**: `TIM4` is used as the HAL timebase source (`HAL_IncTick`) to avoid conflict with the FreeRTOS SysTick tick.
-- **System Clock**: 72 MHz from HSE (8 MHz) × PLL ×9; FreeRTOS tick rate 1000 Hz.
+- **Multi-Queue Communication**:
+  - `LEDCmdQueue`: Transfers structured LED commands (`LEDCmdType`) to the dedicated LED control task.
+  - `UARTStrQueue`: Transfers raw strings from the UART Interrupt Service Routine (ISR) to the command processing task.
+- **Button Task (`BtnTask`)**:
+  - Monitors the user button with software debouncing (20 ms).
+  - Toggles the state of an LED and sends a command to the `LEDCmdQueue`.
+  - Provides visual feedback on the OLED display when a press is detected.
+- **UART Command Task (`CommandTask`)**:
+  - Uses `HAL_UARTEx_ReceiveToIdle_IT` for efficient, variable-length string reception.
+  - Parses commands received via UART (e.g., `"LED1ON"`, `"LED2OFF"`, `"LED3ON"`) and translates them into `LEDCmdType` messages.
+- **LED Control Task (`LEDTask`)**:
+  - Blocks on `LEDCmdQueue` awaiting new commands.
+  - Controls three physical LEDs (LED1, LED2, LED3) based on received messages.
+  - Updates the OLED display with the active LED number and its current state (0/1).
+- **OLED Display Interface**: 0.96" SSD1306 driven via software I2C for real-time status monitoring.
+- **Dedicated HAL Timebase**: Uses a hardware timer (e.g., `TIM4`) as the HAL timebase to avoid conflict with the FreeRTOS SysTick.
+
 ---
 
 ## Task & Queue Specifications
 
 ### Tasks
 
-| Task Name | Priority | Stack Size | Entry Function | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| **`BtnCntTask`** | `osPriorityNormal` | 128 words (512 B) | `StartBtnCntTask` | Key scanning, debouncing, and message enqueueing (Producer). |
-| **`DataPrcsTask`** | `osPriorityLow` | 128 words (512 B) | `StartDataPrcsTask` | Message dequeueing, OLED rendering, and UART transmission (Consumer). |
+| Task Name | Priority | Stack Size | Description |
+| :--- | :--- | :--- | :--- |
+| **`BtnTask`** | `osPriorityHigh` | 512 B | Hardware button monitoring and command generation. |
+| **`CommandTask`** | `osPriorityHigh1` | 512 B | UART string reception and command parsing. |
+| **`LEDTask`** | `osPriorityNormal` | 512 B | LED hardware control and status display. |
 
-### Message Queue
+### Message Queues
 
-| Queue Identifier | Capacity | Message Item Size | Producer | Consumer |
-| :--- | :--- | :--- | :--- | :--- |
-| **`BtnCntQueue`** | 3 items | `sizeof(uint16_t)` (2 Bytes) | `BtnCntTask` (`osMessageQueuePut`) | `DataPrcsTask` (`osMessageQueueGet`) |
+| Queue Identifier | Capacity | Item Size | Purpose |
+| :--- | :--- | :--- | :--- |
+| **`LEDCmdQueue`** | 10 items | `sizeof(LEDCmdType)` | Passes LED number and state to `LEDTask`. |
+| **`UARTStrQueue`** | 5 items | 16 Bytes | Passes received UART strings to `CommandTask`. |
 
-### OLED Layout
+---
 
-| Line | Content |
-| :--- | :--- |
-| 1 | `BtnCnt:` + current counter value (`OLED_ShowNum(1, 8, BtnCnt, 5)`) |
-| 2 | `MsgInQ:` + current number of messages in queue (`osMessageQueueGetCount`) |
-| 3 | `Data Processing.` (shown while the consumer is busy) |
+## Command Interface (UART)
+
+The system listens for specific string commands via USART1 (`115200 8N1`):
+- `LED[1-3]ON`: Turns on the specified LED (e.g., `LED1ON`).
+- `LED[1-3]OFF`: Turns off the specified LED (e.g., `LED2OFF`).
 
 ---
 
 ## File Structure
 
 ```text
-├── CMakeLists.txt              # Root CMake build configuration
-├── CMakePresets.json           # Presets for Debug and Release builds
-├── config.ioc                  # STM32CubeMX configuration file
-├── STM32F103XX_FLASH.ld        # Linker script for STM32F103xB
-├── startup_stm32f103xb.s       # Startup assembly file
 ├── Core/
+│   ├── App/
+│   │   ├── Tasks/
+│   │   │   ├── BtnTask.c       # Button monitoring logic
+│   │   │   ├── CommandTask.c   # UART parsing and command routing
+│   │   │   └── LEDTask.c       # LED hardware control
+│   │   └── Types/
+│   │       └── LEDType.h       # Shared data structures (LEDCmdType)
 │   ├── Inc/
-│   │   ├── main.h              # Common definitions, peripheral pin definitions
-│   │   ├── FreeRTOSConfig.h    # FreeRTOS kernel configuration (V10.3.1)
-│   │   ├── stm32f1xx_hal_conf.h# HAL module configuration
-│   │   ├── stm32f1xx_it.h      # Interrupt handler declarations
-│   │   ├── OLED.h              # OLED driver API declarations
-│   │   ├── OLED_Font.h         # ASCII font bitmaps for OLED display
-│   │   ├── usart.h             # USART1 peripheral header
-│   │   └── gpio.h              # GPIO peripheral header
+│   │   ├── FreeRTOSConfig.h    # Kernel configuration
+│   │   ├── OLED.h              # OLED driver header
+│   │   └── ...
 │   └── Src/
-│       ├── main.c              # System clock, HAL init, FreeRTOS scheduler launch
-│       ├── freertos.c          # FreeRTOS tasks, queue creation, and task handlers
-│       ├── OLED.c              # Software I2C driver and OLED rendering routines
-│       ├── usart.c             # USART1 peripheral initialization
-│       ├── gpio.c              # GPIO configuration (Btn, OLED)
-│       ├── stm32f1xx_hal_timebase_tim.c # TIM4 HAL timebase implementation
-│       ├── stm32f1xx_hal_msp.c # HAL MSP (peripheral init/deinit) routines
-│       ├── stm32f1xx_it.c      # Interrupt service routines
-│       ├── system_stm32f1xx.c  # System clock setup
-│       ├── sysmem.c            # Heap memory management (newlib)
-│       └── syscalls.c          # System call stubs (newlib)
-├── cmake/
-│   ├── user_sources.cmake      # User source file and include directory registration
-│   ├── gcc-arm-none-eabi.cmake # Arm GNU toolchain file
-│   ├── starm-clang.cmake       # Arm Clang toolchain file
-│   └── stm32cubemx/            # CubeMX-generated CMake configurations
-├── Drivers/                    # STM32 HAL Driver & CMSIS core
-└── Middlewares/
-    └── Third_Party/FreeRTOS/   # FreeRTOS kernel source code & CMSIS-RTOS v2 wrapper
+│       ├── freertos.c          # RTOS object creation and task entry points
+│       ├── main.c              # Hardware initialization
+│       ├── OLED.c              # SSD1306 driver implementation
+│       └── ...
+├── Middlewares/
+│   └── Third_Party/FreeRTOS/   # Kernel source code
+└── ...
 ```
+
 ---
 
 ## Hardware Specification & Pinout
