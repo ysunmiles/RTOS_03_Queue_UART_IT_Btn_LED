@@ -87,11 +87,14 @@ The system listens for specific string commands via USART1 (`115200 8N1`):
 
 | Peripheral / Signal | Pin | Mode / Configuration | Description |
 | :--- | :--- | :--- | :--- |
-| **User Button (`Btn`)** | `PA6` | GPIO Input (Pull-Up) | Active Low, debounced button |
-| **OLED SCL** | `PB8` | GPIO Output Open-Drain (High-Speed) | Software I2C Clock line |
-| **OLED SDA** | `PB9` | GPIO Output Open-Drain (High-Speed) | Software I2C Data line |
-| **USART1 TX** | `PA9` | Alternate Function Push-Pull | Serial Transmit (115200 8N1) |
-| **USART1 RX** | `PA10` | Input Floating | Serial Receive |
+| **User Button (`Btn`)** | `PB11` | GPIO Input (Pull-Up) | Active Low, debounced button (Toggles LED1) |
+| **LED 1** | `PA4` | GPIO Output Push-Pull | Controlled by Button or UART |
+| **LED 2** | `PA5` | GPIO Output Push-Pull | Controlled by UART |
+| **LED 3** | `PA6` | GPIO Output Push-Pull | Controlled by UART |
+| **OLED SCL** | `PB8` | GPIO Output Open-Drain | Software I2C Clock |
+| **OLED SDA** | `PB9` | GPIO Output Open-Drain | Software I2C Data |
+| **USART1 TX** | `PA9` | Alternate Function PP | Serial Transmit (115200 8N1) |
+| **USART1 RX** | `PA10` | Input Floating | Serial Receive (Interrupt-driven) |
 
 > **Note**: In `OLED.c` the software-I2C macros map `OLED_W_SCL` to `PB8` and `OLED_W_SDA` to `PB9`. The pin names in `main.h` (`OLED_SDA_Pin`/`OLED_SCL_Pin`) are defined the other way around; the macros in `OLED.c` are what actually drive the display.
 
@@ -122,9 +125,11 @@ cmake --build --preset Debug
 
 1. Flash the compiled ELF/HEX file (`build/Debug/config.elf`) to the target board using **ST-Link**, **DAP-Link**, or **J-Link**.
 2. **Behavior on Run**:
-   - Pressing the user button on `PA6` triggers `BtnCntTask`.
-   - The incremented count is enqueued to `BtnCntQueue`.
-   - `DataPrcsTask` consumes the item, displays `"Data Processing."` on the OLED, updates the counter display (`BtnCnt`), and logs `"BtnCnt: <value>"` over USART1.
+   - **Button Interaction**: Pressing the user button on `PB11` sends a toggle command to `LEDCmdQueue`. `LEDTask` receives it, toggles **LED1**, and shows `"Btn Pressed"` on the OLED.
+   - **UART Interaction**: Send commands like `LED1ON`, `LED2OFF`, or `LED3ON` via a serial terminal (115200 8N1).
+     - The UART ISR receives the string and puts it into `UARTStrQueue`.
+     - `CommandTask` parses the string and sends a corresponding command to `LEDCmdQueue`.
+     - `LEDTask` updates the target LED state and displays the LED number and state on the OLED.
 
 ---
 
