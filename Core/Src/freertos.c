@@ -16,17 +16,18 @@
  ******************************************************************************
  */
 /* USER CODE END Header */
-
+#include "main.h"
 /* Includes ------------------------------------------------------------------*/
 #include "FreeRTOS.h"
 #include "task.h"
-#include "main.h"
+
 #include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "OLED.h"
 #include "usart.h"
+#include "LEDType.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -64,19 +65,24 @@ osThreadId_t BtnTaskHandle;
 const osThreadAttr_t BtnTask_attributes = {
   .name = "BtnTask",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
+  .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for CommandTask */
 osThreadId_t CommandTaskHandle;
 const osThreadAttr_t CommandTask_attributes = {
   .name = "CommandTask",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
+  .priority = (osPriority_t) osPriorityHigh1,
 };
-/* Definitions for BtnCntQueue */
-osMessageQueueId_t BtnCntQueueHandle;
-const osMessageQueueAttr_t BtnCntQueue_attributes = {
-  .name = "BtnCntQueue"
+/* Definitions for LEDCmdQueue */
+osMessageQueueId_t LEDCmdQueueHandle;
+const osMessageQueueAttr_t LEDCmdQueue_attributes = {
+  .name = "LEDCmdQueue"
+};
+/* Definitions for UARTStrQueue */
+osMessageQueueId_t UARTStrQueueHandle;
+const osMessageQueueAttr_t UARTStrQueue_attributes = {
+  .name = "UARTStrQueue"
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -85,8 +91,8 @@ const osMessageQueueAttr_t BtnCntQueue_attributes = {
 /* USER CODE END FunctionPrototypes */
 
 void StartLEDTask(void *argument);
-extern void StartBtnTask(void *argument);
-extern void StartCommandTask(void *argument);
+void StartBtnTask(void *argument);
+void StartCommandTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -124,8 +130,11 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE END RTOS_TIMERS */
 
   /* Create the queue(s) */
-  /* creation of BtnCntQueue */
-  BtnCntQueueHandle = osMessageQueueNew (3, sizeof(uint16_t), &BtnCntQueue_attributes);
+  /* creation of LEDCmdQueue */
+  LEDCmdQueueHandle = osMessageQueueNew (10, sizeof(LEDCmdType*), &LEDCmdQueue_attributes);
+
+  /* creation of UARTStrQueue */
+  UARTStrQueueHandle = osMessageQueueNew (5, sizeof(char*), &UARTStrQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -167,6 +176,42 @@ __weak void StartLEDTask(void *argument)
     osDelay(1);
   }
   /* USER CODE END StartLEDTask */
+}
+
+/* USER CODE BEGIN Header_StartBtnTask */
+/**
+* @brief Function implementing the BtnTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartBtnTask */
+__weak void StartBtnTask(void *argument)
+{
+  /* USER CODE BEGIN StartBtnTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartBtnTask */
+}
+
+/* USER CODE BEGIN Header_StartCommandTask */
+/**
+* @brief Function implementing the CommandTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartCommandTask */
+__weak void StartCommandTask(void *argument)
+{
+  /* USER CODE BEGIN StartCommandTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartCommandTask */
 }
 
 /* Private application code --------------------------------------------------*/

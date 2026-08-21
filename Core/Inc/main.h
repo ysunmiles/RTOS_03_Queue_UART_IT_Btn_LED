@@ -31,7 +31,8 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "cmsis_os2.h"
+#include "OLED.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -41,7 +42,8 @@ extern "C" {
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
-
+extern osMessageQueueId_t LEDCmdQueueHandle;
+extern osMessageQueueId_t UARTStrQueueHandle;
 /* USER CODE END EC */
 
 /* Exported macro ------------------------------------------------------------*/

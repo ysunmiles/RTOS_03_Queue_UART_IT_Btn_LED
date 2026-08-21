@@ -25,6 +25,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "OLED.h"
+#include "LEDType.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -92,8 +93,8 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   OLED_Init();
-  OLED_ShowString(1, 1, "BtnCnt:");
-  OLED_ShowString(2, 1, "MsgInQ:");
+  OLED_ShowString(2, 1, "LEDCmd.num  :");
+  OLED_ShowString(3, 1, "LEDCmd.state:");
   /* USER CODE END 2 */
 
   /* Init scheduler */
